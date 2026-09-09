@@ -37,6 +37,11 @@ public class PaymentService {
                         "RESOURCE_NOT_OWNED",
                         "Quotation is not owned by the authenticated user"));
 
+        if (!"PAYMENT_PENDING".equals(quotation.getStatus())) {
+            throw new IllegalArgumentException(
+                "Payment can only be recorded for quotations in PAYMENT_PENDING status");
+        }
+
         LocalDateTime now = LocalDateTime.now();
         Payment payment = paymentRepository.findByQuotationId(quotation.getId())
                 .orElseGet(() -> {
@@ -48,6 +53,13 @@ public class PaymentService {
         payment.setOutcome(outcome);
         payment.setUpdatedAt(now);
 
-        return PaymentResponse.from(paymentRepository.save(payment));
+        Payment savedPayment = paymentRepository.save(payment);
+        if (outcome == Payment.Outcome.SUCCESS) {
+            quotation.setStatus("PAYMENT_CONFIRMED");
+            quotation.setUpdatedAt(now);
+        }
+        quotationRepository.save(quotation);
+
+        return PaymentResponse.from(savedPayment);
     }
 }

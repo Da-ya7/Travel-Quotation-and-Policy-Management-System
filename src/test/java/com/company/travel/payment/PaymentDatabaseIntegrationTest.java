@@ -3,7 +3,9 @@ package com.company.travel.payment;
 import com.company.travel.auth.entity.User;
 import com.company.travel.auth.repository.UserRepository;
 import com.company.travel.payment.entity.Payment;
+import com.company.travel.payment.dto.PaymentResponse;
 import com.company.travel.payment.repository.PaymentRepository;
+import com.company.travel.payment.service.PaymentService;
 import com.company.travel.quotation.entity.Quotation;
 import com.company.travel.quotation.repository.QuotationRepository;
 
@@ -35,6 +37,9 @@ class PaymentDatabaseIntegrationTest {
     private PaymentRepository paymentRepository;
 
     @Autowired
+    private PaymentService paymentService;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Test
@@ -63,23 +68,20 @@ class PaymentDatabaseIntegrationTest {
         quotation.setCoverType("TRAVEL");
         quotation.setSumInsured(new BigDecimal("10000"));
         quotation.setCurrency("USD");
-        quotation.setStatus("DRAFT");
+        quotation.setStatus("PAYMENT_PENDING");
         quotation.setCreatedByUserId(user.getId());
         quotation.setCreatedAt(LocalDateTime.now());
         quotation.setUpdatedAt(LocalDateTime.now());
         quotation = quotationRepository.saveAndFlush(quotation);
 
-        Payment payment = new Payment();
-        payment.setQuotationId(quotation.getId());
-        payment.setOutcome(Payment.Outcome.SUCCESS);
-        payment.setRecordedAt(LocalDateTime.now());
-        payment.setUpdatedAt(payment.getRecordedAt());
-        payment = paymentRepository.saveAndFlush(payment);
+        PaymentResponse payment = paymentService.record(
+            quotation.getId(), Payment.Outcome.SUCCESS, user.getUsername());
+        paymentRepository.flush();
 
         Payment saved = paymentRepository.findByQuotationId(quotation.getId()).orElseThrow();
         assertTrue(payment.getId() != null);
         assertEquals(Payment.Outcome.SUCCESS, saved.getOutcome());
         assertEquals(quotation.getId(), saved.getQuotationId());
-        assertEquals("DRAFT", quotationRepository.findById(quotation.getId()).orElseThrow().getStatus());
+        assertEquals("PAYMENT_CONFIRMED", quotationRepository.findById(quotation.getId()).orElseThrow().getStatus());
     }
 }

@@ -40,7 +40,7 @@ class PaymentServiceTest {
 
     @Test
     void recordsSuccessfulPaymentForOwnQuotation() {
-        givenOwnQuotation();
+        givenOwnQuotation("PAYMENT_PENDING");
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> saved(invocation.getArgument(0)));
 
         PaymentResponse response = paymentService.record(42L, Payment.Outcome.SUCCESS, "uw.ravi");
@@ -48,22 +48,28 @@ class PaymentServiceTest {
         assertEquals(42L, response.getQuotationId());
         assertEquals(Payment.Outcome.SUCCESS, response.getOutcome());
         assertNotNull(response.getRecordedAt());
+        assertEquals("PAYMENT_CONFIRMED", quotationRepository.findByIdAndCreatedByUserId(42L, 7L)
+            .orElseThrow().getStatus());
         verify(paymentRepository).save(any(Payment.class));
+        verify(quotationRepository).save(any(Quotation.class));
     }
 
     @Test
     void recordsFailedPaymentForOwnQuotation() {
-        givenOwnQuotation();
+        givenOwnQuotation("PAYMENT_PENDING");
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> saved(invocation.getArgument(0)));
 
         PaymentResponse response = paymentService.record(42L, Payment.Outcome.FAILED, "uw.ravi");
 
         assertEquals(Payment.Outcome.FAILED, response.getOutcome());
+        assertEquals("PAYMENT_PENDING", quotationRepository.findByIdAndCreatedByUserId(42L, 7L)
+            .orElseThrow().getStatus());
+        verify(quotationRepository).save(any(Quotation.class));
     }
 
     @Test
     void repeatedPaymentUpdatesExistingPaymentDeterministically() {
-        givenOwnQuotation();
+        givenOwnQuotation("PAYMENT_PENDING");
         Payment existing = new Payment();
         existing.setId(7L);
         existing.setQuotationId(42L);
@@ -78,7 +84,38 @@ class PaymentServiceTest {
         assertEquals(7L, response.getId());
         assertEquals(Payment.Outcome.FAILED, response.getOutcome());
         assertEquals(existing.getRecordedAt(), response.getRecordedAt());
+        verify(quotationRepository).save(any(Quotation.class));
+        }
+
+        @Test
+        void draftQuotationCannotRecordSuccessfulPayment() {
+        givenOwnQuotation("DRAFT");
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+            () -> paymentService.record(42L, Payment.Outcome.SUCCESS, "uw.ravi"));
+
+        assertEquals("Payment can only be recorded for quotations in PAYMENT_PENDING status",
+            exception.getMessage());
+        }
+
+        @Test
+        void quotedQuotationCannotRecordSuccessfulPayment() {
+        givenOwnQuotation("QUOTED");
+
+        assertThrows(IllegalArgumentException.class,
+            () -> paymentService.record(42L, Payment.Outcome.SUCCESS, "uw.ravi"));
     }
+
+        @Test
+        void repeatedSuccessfulPaymentIsRejectedAfterConfirmation() {
+            givenOwnQuotation("PAYMENT_PENDING");
+            when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> saved(invocation.getArgument(0)));
+
+            paymentService.record(42L, Payment.Outcome.SUCCESS, "uw.ravi");
+
+            assertThrows(IllegalArgumentException.class,
+                    () -> paymentService.record(42L, Payment.Outcome.SUCCESS, "uw.ravi"));
+        }
 
     @Test
     void foreignQuotationIsNotExposed() {
@@ -102,11 +139,12 @@ class PaymentServiceTest {
         assertEquals("RESOURCE_NOT_OWNED", exception.getErrorCode());
     }
 
-    private void givenOwnQuotation() {
+    private void givenOwnQuotation(String status) {
         when(userService.findByUsername("uw.ravi")).thenReturn(user(7L));
         Quotation quotation = new Quotation();
         quotation.setId(42L);
         quotation.setCreatedByUserId(7L);
+        quotation.setStatus(status);
         when(quotationRepository.findByIdAndCreatedByUserId(42L, 7L)).thenReturn(Optional.of(quotation));
         when(paymentRepository.findByQuotationId(42L)).thenReturn(Optional.empty());
     }
