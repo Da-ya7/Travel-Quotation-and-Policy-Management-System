@@ -3,123 +3,261 @@ package com.company.travel.config;
 import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.context.annotation.Bean;
+
 import org.springframework.context.annotation.Configuration;
+
 import org.springframework.context.annotation.Lazy;
 
 import org.springframework.security.authentication.AuthenticationManager;
+
 import org.springframework.security.authentication.ProviderManager;
+
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+
 import org.springframework.security.config.http.SessionCreationPolicy;
 
 import org.springframework.security.core.userdetails.UserDetailsService;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import org.springframework.security.web.AuthenticationEntryPoint;
+
 import org.springframework.security.web.SecurityFilterChain;
+
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import org.springframework.web.cors.CorsConfiguration;
+
+import org.springframework.web.cors.CorsConfigurationSource;
+
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
+
 @Configuration
+
 @EnableWebSecurity
+
 @EnableMethodSecurity
+
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+        private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    public SecurityConfig(
-            @Lazy JwtAuthenticationFilter jwtAuthenticationFilter) {
+        public SecurityConfig(
 
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
-    }
+                        @Lazy JwtAuthenticationFilter jwtAuthenticationFilter) {
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(
-            HttpSecurity http) throws Exception {
+                this.jwtAuthenticationFilter = jwtAuthenticationFilter;
 
-        http
+        }
 
-                // Disable CSRF because this is a stateless REST API
-                .csrf(csrf -> csrf.disable())
+        @Bean
 
-                // Do not create HTTP sessions
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(
-                                SessionCreationPolicy.STATELESS))
+        public SecurityFilterChain securityFilterChain(
 
-                // Define which endpoints require authentication
-                .authorizeHttpRequests(auth -> auth
+                        HttpSecurity http) throws Exception {
 
-                        // Login and refresh do not require an access token
-                        .requestMatchers(
-                                "/api/v1/auth/login",
-                                "/api/v1/auth/refresh")
-                        .permitAll()
+                http
 
-                        // Everything else requires authentication
-                        .anyRequest().authenticated())
+                                // Disable CSRF because this is a stateless REST API
 
-                // Handle authentication and authorization errors
-                .exceptionHandling(exception -> exception
+                                .csrf(csrf -> csrf.disable())
 
-                        // 401 = user is not authenticated
-                        .authenticationEntryPoint(
-                                authenticationEntryPoint())
+                                // Enable CORS for Angular frontend
 
-                        // 403 = user is authenticated
-                        // but does not have the required authority
-                        .accessDeniedHandler(
-                                (request, response, accessDeniedException) -> {
+                                .cors(cors -> cors.configurationSource(
 
-                                    response.setStatus(
-                                            HttpServletResponse.SC_FORBIDDEN);
+                                                corsConfigurationSource()))
 
-                                    response.setContentType(
-                                            "application/json");
+                                // Do not create HTTP sessions
 
-                                    response.getWriter().write("""
-                                            {
-                                                "error": "FORBIDDEN"
-                                            }
-                                            """);
-                                }))
+                                .sessionManagement(session -> session
 
-                // Run our JWT filter before Spring's
-                // username/password authentication filter
-                .addFilterBefore(
-                        jwtAuthenticationFilter,
-                        UsernamePasswordAuthenticationFilter.class);
+                                                .sessionCreationPolicy(
 
-        return http.build();
-    }
+                                                                SessionCreationPolicy.STATELESS))
 
-    @Bean
-    public AuthenticationEntryPoint authenticationEntryPoint() {
+                                // Define which endpoints require authentication
 
-        return (request, response, authException) -> response.sendError(
-                HttpServletResponse.SC_UNAUTHORIZED,
-                "Unauthorized");
-    }
+                                .authorizeHttpRequests(auth -> auth
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
+                                                // Login and refresh do not require an access token
 
-        return new BCryptPasswordEncoder();
-    }
+                                                .requestMatchers(
 
-    @Bean
-    public AuthenticationManager authenticationManager(
-            UserDetailsService userDetailsService,
-            PasswordEncoder passwordEncoder) {
+                                                                "/api/v1/auth/login",
 
-        DaoAuthenticationProvider authenticationProvider = new DaoAuthenticationProvider(userDetailsService);
+                                                                "/api/v1/auth/refresh")
 
-        authenticationProvider.setPasswordEncoder(passwordEncoder);
+                                                .permitAll()
 
-        return new ProviderManager(authenticationProvider);
-    }
+                                                // Everything else requires authentication
+
+                                                .anyRequest().authenticated())
+
+                                // Handle authentication and authorization errors
+
+                                .exceptionHandling(exception -> exception
+
+                                                // 401 = user is not authenticated
+
+                                                .authenticationEntryPoint(
+
+                                                                authenticationEntryPoint())
+
+                                                // 403 = user is authenticated
+
+                                                // but does not have the required authority
+
+                                                .accessDeniedHandler(
+
+                                                                (request, response, accessDeniedException) -> {
+
+                                                                        response.setStatus(
+
+                                                                                        HttpServletResponse.SC_FORBIDDEN);
+
+                                                                        response.setContentType(
+
+                                                                                        "application/json");
+
+                                                                        response.getWriter().write("""
+
+                                                                                        {
+
+                                                                                        "error": "FORBIDDEN"
+
+                                                                                        }
+
+                                                                                        """);
+
+                                                                }))
+
+                                // Run our JWT filter before Spring's
+
+                                // username/password authentication filter
+
+                                .addFilterBefore(
+
+                                                jwtAuthenticationFilter,
+
+                                                UsernamePasswordAuthenticationFilter.class);
+
+                return http.build();
+
+        }
+
+        @Bean
+
+        public AuthenticationEntryPoint authenticationEntryPoint() {
+
+                return (request, response, authException) -> response.sendError(
+
+                                HttpServletResponse.SC_UNAUTHORIZED,
+
+                                "Unauthorized");
+
+        }
+
+        @Bean
+
+        public PasswordEncoder passwordEncoder() {
+
+                return new BCryptPasswordEncoder();
+
+        }
+
+        @Bean
+
+        public AuthenticationManager authenticationManager(
+
+                        UserDetailsService userDetailsService,
+
+                        PasswordEncoder passwordEncoder) {
+
+                DaoAuthenticationProvider authenticationProvider =
+
+                                new DaoAuthenticationProvider(userDetailsService);
+
+                authenticationProvider.setPasswordEncoder(passwordEncoder);
+
+                return new ProviderManager(authenticationProvider);
+
+        }
+
+        @Bean
+
+        public CorsConfigurationSource corsConfigurationSource() {
+
+                CorsConfiguration configuration =
+
+                                new CorsConfiguration();
+
+                // Allow Angular frontend
+
+                configuration.setAllowedOrigins(
+
+                                List.of("http://localhost:4200")
+
+                );
+
+                // Allow required HTTP methods
+
+                configuration.setAllowedMethods(
+
+                                List.of(
+
+                                                "GET",
+
+                                                "POST",
+
+                                                "PUT",
+
+                                                "DELETE",
+
+                                                "OPTIONS"
+
+                                )
+
+                );
+
+                // Allow headers required by the Angular application
+
+                configuration.setAllowedHeaders(
+
+                                List.of(
+
+                                                "Authorization",
+
+                                                "Content-Type"
+
+                                )
+
+                );
+
+                UrlBasedCorsConfigurationSource source =
+
+                                new UrlBasedCorsConfigurationSource();
+
+                source.registerCorsConfiguration(
+
+                                "/**",
+
+                                configuration
+
+                );
+
+                return source;
+
+        }
+
 }
