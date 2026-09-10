@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pytesseract
+Pillow
+pdf2image
+httpx
+pydantic
+pytest

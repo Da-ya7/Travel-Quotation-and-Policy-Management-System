@@ -33,6 +33,7 @@ build/
 .env
 .env.*
 !.env.example
+.venv/
 
 # Local Spring configuration containing secrets
 src/main/resources/application-local.properties
