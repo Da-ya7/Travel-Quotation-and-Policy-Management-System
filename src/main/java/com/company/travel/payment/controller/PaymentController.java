@@ -22,6 +22,14 @@ public class PaymentController {
         this.paymentService = paymentService;
     }
 
+    @PostMapping({ "", "/initiate" })
+    @PreAuthorize("hasAuthority('PAYMENT_COLLECT')")
+    public ResponseEntity<PaymentResponse> initiate(
+            @PathVariable Long quotationId,
+            Authentication authentication) {
+        return ResponseEntity.ok(paymentService.initiate(quotationId, authentication.getName()));
+    }
+
     @PostMapping("/success")
     @PreAuthorize("hasAuthority('PAYMENT_COLLECT')")
     public ResponseEntity<PaymentResponse> success(

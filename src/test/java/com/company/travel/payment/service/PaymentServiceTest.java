@@ -49,7 +49,7 @@ class PaymentServiceTest {
         assertEquals(Payment.Outcome.SUCCESS, response.getOutcome());
         assertNotNull(response.getRecordedAt());
         assertEquals("PAYMENT_CONFIRMED", quotationRepository.findByIdAndCreatedByUserId(42L, 7L)
-            .orElseThrow().getStatus());
+                .orElseThrow().getStatus());
         verify(paymentRepository).save(any(Payment.class));
         verify(quotationRepository).save(any(Quotation.class));
     }
@@ -62,60 +62,86 @@ class PaymentServiceTest {
         PaymentResponse response = paymentService.record(42L, Payment.Outcome.FAILED, "uw.ravi");
 
         assertEquals(Payment.Outcome.FAILED, response.getOutcome());
-        assertEquals("PAYMENT_PENDING", quotationRepository.findByIdAndCreatedByUserId(42L, 7L)
-            .orElseThrow().getStatus());
+        assertEquals("QUOTED", quotationRepository.findByIdAndCreatedByUserId(42L, 7L)
+                .orElseThrow().getStatus());
         verify(quotationRepository).save(any(Quotation.class));
     }
 
     @Test
-    void repeatedPaymentUpdatesExistingPaymentDeterministically() {
-        givenOwnQuotation("PAYMENT_PENDING");
-        Payment existing = new Payment();
-        existing.setId(7L);
-        existing.setQuotationId(42L);
-        existing.setOutcome(Payment.Outcome.SUCCESS);
-        existing.setRecordedAt(LocalDateTime.now().minusMinutes(1));
-        existing.setUpdatedAt(existing.getRecordedAt());
-        when(paymentRepository.findByQuotationId(42L)).thenReturn(Optional.of(existing));
+    void initiatesPaymentFromQuotedQuotation() {
+        givenOwnQuotation("QUOTED");
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        PaymentResponse response = paymentService.record(42L, Payment.Outcome.FAILED, "uw.ravi");
+        PaymentResponse response = paymentService.initiate(42L, "uw.ravi");
 
-        assertEquals(7L, response.getId());
-        assertEquals(Payment.Outcome.FAILED, response.getOutcome());
-        assertEquals(existing.getRecordedAt(), response.getRecordedAt());
+        assertEquals(Payment.Outcome.INITIATED, response.getOutcome());
+        assertEquals("PAYMENT_PENDING", quotationRepository.findByIdAndCreatedByUserId(42L, 7L)
+                .orElseThrow().getStatus());
         verify(quotationRepository).save(any(Quotation.class));
-        }
+    }
 
-        @Test
-        void draftQuotationCannotRecordSuccessfulPayment() {
+    @Test
+    void failedPaymentCanBeRetriedFromQuotedQuotation() {
+        givenOwnQuotation("QUOTED");
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> saved(invocation.getArgument(0)));
+
+        paymentService.initiate(42L, "uw.ravi");
+        paymentService.record(42L, Payment.Outcome.FAILED, "uw.ravi");
+        PaymentResponse retry = paymentService.initiate(42L, "uw.ravi");
+
+        assertEquals(Payment.Outcome.INITIATED, retry.getOutcome());
+        assertEquals("PAYMENT_PENDING", quotationRepository.findByIdAndCreatedByUserId(42L, 7L)
+                .orElseThrow().getStatus());
+    }
+
+    @Test
+    void draftQuotationCannotRecordSuccessfulPayment() {
         givenOwnQuotation("DRAFT");
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-            () -> paymentService.record(42L, Payment.Outcome.SUCCESS, "uw.ravi"));
+                () -> paymentService.record(42L, Payment.Outcome.SUCCESS, "uw.ravi"));
 
         assertEquals("Payment can only be recorded for quotations in PAYMENT_PENDING status",
-            exception.getMessage());
-        }
+                exception.getMessage());
+    }
 
-        @Test
-        void quotedQuotationCannotRecordSuccessfulPayment() {
+    @Test
+    void quotedQuotationCannotRecordSuccessfulPayment() {
         givenOwnQuotation("QUOTED");
 
         assertThrows(IllegalArgumentException.class,
-            () -> paymentService.record(42L, Payment.Outcome.SUCCESS, "uw.ravi"));
+                () -> paymentService.record(42L, Payment.Outcome.SUCCESS, "uw.ravi"));
     }
 
-        @Test
-        void repeatedSuccessfulPaymentIsRejectedAfterConfirmation() {
-            givenOwnQuotation("PAYMENT_PENDING");
-            when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> saved(invocation.getArgument(0)));
+    @Test
+    void draftQuotationCannotInitiatePayment() {
+        givenOwnQuotation("DRAFT");
 
-            paymentService.record(42L, Payment.Outcome.SUCCESS, "uw.ravi");
+        assertThrows(IllegalArgumentException.class,
+                () -> paymentService.initiate(42L, "uw.ravi"));
+    }
 
-            assertThrows(IllegalArgumentException.class,
-                    () -> paymentService.record(42L, Payment.Outcome.SUCCESS, "uw.ravi"));
-        }
+    @Test
+    void repeatedSuccessfulPaymentIsRejectedAfterConfirmation() {
+        givenOwnQuotation("PAYMENT_PENDING");
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> saved(invocation.getArgument(0)));
+
+        paymentService.record(42L, Payment.Outcome.SUCCESS, "uw.ravi");
+
+        assertThrows(IllegalArgumentException.class,
+                () -> paymentService.record(42L, Payment.Outcome.SUCCESS, "uw.ravi"));
+    }
+
+    @Test
+    void existingSuccessfulPaymentCannotBeChanged() {
+        givenOwnQuotation("PAYMENT_PENDING");
+        Payment existing = new Payment();
+        existing.setOutcome(Payment.Outcome.SUCCESS);
+        when(paymentRepository.findByQuotationId(42L)).thenReturn(Optional.of(existing));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> paymentService.record(42L, Payment.Outcome.SUCCESS, "uw.ravi"));
+    }
 
     @Test
     void foreignQuotationIsNotExposed() {

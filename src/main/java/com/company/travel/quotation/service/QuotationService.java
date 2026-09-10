@@ -75,6 +75,24 @@ public class QuotationService {
         return QuotationResponse.from(quotationRepository.save(quotation));
     }
 
+    @Transactional
+    public QuotationResponse finalizeQuotation(Long quotationId, String username) {
+        Long userId = authenticatedUser(username).getId();
+        Quotation quotation = quotationRepository.findByIdAndCreatedByUserId(quotationId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "RESOURCE_NOT_OWNED",
+                        "Quotation is not owned by the authenticated user"));
+
+        if (!"DRAFT".equals(quotation.getStatus())) {
+            throw new IllegalArgumentException(
+                    "Only quotations in DRAFT status can be finalized");
+        }
+
+        quotation.setStatus("QUOTED");
+        quotation.setUpdatedAt(LocalDateTime.now());
+        return QuotationResponse.from(quotationRepository.save(quotation));
+    }
+
     @Transactional(readOnly = true)
     public List<QuotationResponse> findOwn(String username) {
         Long userId = authenticatedUser(username).getId();

@@ -76,6 +76,33 @@ class QuotationServiceTest {
     }
 
     @Test
+    void finalizesOnlyOwnDraftQuotation() {
+        when(userService.findByUsername("uw.ravi")).thenReturn(user(7L, "uw.ravi"));
+        Quotation quotation = quotation(11L, 7L);
+        when(quotationRepository.findByIdAndCreatedByUserId(11L, 7L))
+                .thenReturn(Optional.of(quotation));
+        when(quotationRepository.save(any(Quotation.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        QuotationResponse result = quotationService.finalizeQuotation(11L, "uw.ravi");
+
+        assertEquals("QUOTED", result.getStatus());
+        verify(quotationRepository).save(quotation);
+    }
+
+    @Test
+    void finalizedQuotationCannotMoveBackwardToQuotedAgain() {
+        when(userService.findByUsername("uw.ravi")).thenReturn(user(7L, "uw.ravi"));
+        Quotation quotation = quotation(11L, 7L);
+        quotation.setStatus("PAYMENT_PENDING");
+        when(quotationRepository.findByIdAndCreatedByUserId(11L, 7L))
+                .thenReturn(Optional.of(quotation));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> quotationService.finalizeQuotation(11L, "uw.ravi"));
+    }
+
+    @Test
     void listsOnlyAuthenticatedUsersQuotations() {
         when(userService.findByUsername("uw.ravi")).thenReturn(user(7L, "uw.ravi"));
         Quotation quotation = quotation(11L, 7L);

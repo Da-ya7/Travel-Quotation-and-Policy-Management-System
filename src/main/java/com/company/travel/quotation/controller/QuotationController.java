@@ -38,6 +38,15 @@ public class QuotationController {
                 .body(quotationService.create(request, authentication.getName()));
     }
 
+    @PostMapping("/{id}/finalize")
+    @PreAuthorize("hasAuthority('QUOTATION_CREATE')")
+    public ResponseEntity<QuotationResponse> finalizeQuotation(
+            @PathVariable Long id,
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                quotationService.finalizeQuotation(id, authentication.getName()));
+    }
+
     @GetMapping
     @PreAuthorize("hasAuthority('QUOTATION_VIEW_OWN')")
     public ResponseEntity<List<QuotationResponse>> findOwn(Authentication authentication) {
