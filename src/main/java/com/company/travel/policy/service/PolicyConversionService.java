@@ -13,6 +13,7 @@ import com.company.travel.policy.exception.PolicyConversionException;
 import com.company.travel.policy.repository.PolicyRepository;
 import com.company.travel.quotation.entity.Quotation;
 import com.company.travel.quotation.repository.QuotationRepository;
+import com.company.travel.war.service.WarGeographyMatchingService;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,15 +35,18 @@ public class PolicyConversionService {
     private final DocumentRepository documentRepository;
     private final PolicyRepository policyRepository;
     private final UserService userService;
+    private final WarGeographyMatchingService warGeographyMatchingService;
 
     public PolicyConversionService(QuotationRepository quotationRepository,
             PaymentRepository paymentRepository, DocumentRepository documentRepository,
-            PolicyRepository policyRepository, UserService userService) {
+            PolicyRepository policyRepository, UserService userService,
+            WarGeographyMatchingService warGeographyMatchingService) {
         this.quotationRepository = quotationRepository;
         this.paymentRepository = paymentRepository;
         this.documentRepository = documentRepository;
         this.policyRepository = policyRepository;
         this.userService = userService;
+        this.warGeographyMatchingService = warGeographyMatchingService;
     }
 
     @Transactional
@@ -80,12 +84,15 @@ public class PolicyConversionService {
                     "A VALID TRAVEL_TICKET and HOTEL_BOOKING document are required before conversion");
         }
 
+        boolean requiresApproval = warGeographyMatchingService.match(
+                quotation.getDestinationCountry(), quotation.getDestinationCity()).matched();
+
         LocalDateTime now = LocalDateTime.now();
         Policy policy = new Policy();
         policy.setPolicyNumber(generatePolicyNumber());
         policy.setQuotationId(quotation.getId());
-        policy.setStatus("ISSUED");
-        policy.setRequiresApproval(false);
+        policy.setStatus(requiresApproval ? "PENDING_APPROVAL" : "ISSUED");
+        policy.setRequiresApproval(requiresApproval);
         policy.setCreatedByUserId(user.getId());
         policy.setIssuedAt(now);
         policy.setCreatedAt(now);

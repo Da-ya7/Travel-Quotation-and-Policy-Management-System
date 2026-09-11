@@ -12,6 +12,7 @@ import com.company.travel.policy.exception.PolicyConversionException;
 import com.company.travel.policy.repository.PolicyRepository;
 import com.company.travel.quotation.entity.Quotation;
 import com.company.travel.quotation.repository.QuotationRepository;
+import com.company.travel.war.service.WarGeographyMatchingService;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,7 @@ class PolicyConversionServiceTest {
     private DocumentRepository documentRepository;
     private PolicyRepository policyRepository;
     private UserService userService;
+    private WarGeographyMatchingService warGeographyMatchingService;
     private PolicyConversionService service;
 
     @BeforeEach
@@ -43,8 +45,11 @@ class PolicyConversionServiceTest {
         documentRepository = mock(DocumentRepository.class);
         policyRepository = mock(PolicyRepository.class);
         userService = mock(UserService.class);
+        warGeographyMatchingService = mock(WarGeographyMatchingService.class);
+        when(warGeographyMatchingService.match(any(), any()))
+                .thenReturn(new WarGeographyMatchingService.MatchResult(false, null));
         service = new PolicyConversionService(quotationRepository, paymentRepository,
-                documentRepository, policyRepository, userService);
+                documentRepository, policyRepository, userService, warGeographyMatchingService);
     }
 
     @Test
@@ -62,6 +67,21 @@ class PolicyConversionServiceTest {
         assertEquals(7L, response.getCreatedByUserId());
         verify(policyRepository).save(any(Policy.class));
         verify(quotationRepository).save(quotation);
+    }
+
+    @Test
+    void convertsWarQuotationToPendingApprovalPolicy() {
+        Quotation quotation = givenEligibleQuotation();
+        when(warGeographyMatchingService.match(any(), any()))
+                .thenReturn(new WarGeographyMatchingService.MatchResult(true, null));
+        when(policyRepository.existsByPolicyNumber(any())).thenReturn(false);
+        when(policyRepository.save(any(Policy.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = service.convert(42L, "uw.ravi");
+
+        assertEquals("PENDING_APPROVAL", response.getStatus());
+        org.junit.jupiter.api.Assertions.assertTrue(response.isRequiresApproval());
     }
 
     @Test

@@ -8,6 +8,7 @@ import com.company.travel.auth.exception.ResourceNotFoundException;
 import com.company.travel.auth.exception.UserNotMappedToGroupException;
 import com.company.travel.document.exception.InvalidDocumentsException;
 import com.company.travel.policy.exception.PolicyConversionException;
+import com.company.travel.war.exception.DuplicateWarGeographyException;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -52,6 +53,15 @@ public class GlobalExceptionHandler {
                                 .status(HttpStatus.CONFLICT)
                                 .body(Map.of(
                                                 "error", exception.getErrorCode()));
+        }
+
+        @ExceptionHandler(DuplicateWarGeographyException.class)
+        public ResponseEntity<Map<String, String>> handleDuplicateWarGeography(
+                        DuplicateWarGeographyException exception) {
+
+                return ResponseEntity
+                                .status(HttpStatus.CONFLICT)
+                                .body(Map.of("error", "WAR_GEOGRAPHY_ALREADY_EXISTS"));
         }
 
         @ExceptionHandler(ResourceNotFoundException.class)
