@@ -3,6 +3,8 @@ package com.company.travel.quotation.controller;
 import com.company.travel.quotation.dto.CreateQuotationRequest;
 import com.company.travel.quotation.dto.QuotationResponse;
 import com.company.travel.quotation.service.QuotationService;
+import com.company.travel.policy.dto.PolicyResponse;
+import com.company.travel.policy.service.PolicyConversionService;
 
 import jakarta.validation.Valid;
 
@@ -24,9 +26,12 @@ import java.util.List;
 public class QuotationController {
 
     private final QuotationService quotationService;
+    private final PolicyConversionService policyConversionService;
 
-    public QuotationController(QuotationService quotationService) {
+    public QuotationController(QuotationService quotationService,
+            PolicyConversionService policyConversionService) {
         this.quotationService = quotationService;
+        this.policyConversionService = policyConversionService;
     }
 
     @PostMapping
@@ -45,6 +50,15 @@ public class QuotationController {
             Authentication authentication) {
         return ResponseEntity.ok(
                 quotationService.finalizeQuotation(id, authentication.getName()));
+    }
+
+    @PostMapping("/{id}/convert-to-policy")
+    @PreAuthorize("hasAuthority('QUOTATION_CONVERT_POLICY')")
+    public ResponseEntity<PolicyResponse> convertToPolicy(
+            @PathVariable Long id,
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                policyConversionService.convert(id, authentication.getName()));
     }
 
     @GetMapping

@@ -7,6 +7,7 @@ import com.company.travel.auth.exception.InvalidAuthorityException;
 import com.company.travel.auth.exception.ResourceNotFoundException;
 import com.company.travel.auth.exception.UserNotMappedToGroupException;
 import com.company.travel.document.exception.InvalidDocumentsException;
+import com.company.travel.policy.exception.PolicyConversionException;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -98,6 +99,15 @@ public class GlobalExceptionHandler {
                                 .status(HttpStatus.BAD_REQUEST)
                                 .body(Map.of(
                                                 "error", "INVALID_REQUEST",
+                                                "message", exception.getMessage()));
+        }
+
+        @ExceptionHandler(PolicyConversionException.class)
+        public ResponseEntity<Map<String, String>> handlePolicyConversion(
+                        PolicyConversionException exception) {
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                                .body(Map.of(
+                                                "error", exception.getErrorCode(),
                                                 "message", exception.getMessage()));
         }
 

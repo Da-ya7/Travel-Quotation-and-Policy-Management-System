@@ -135,8 +135,8 @@ class QuotationServiceTest {
         request.setOriginCountry("LK");
         request.setDestinationCountry("FR");
         request.setDestinationCity("Paris");
-        request.setTravelStartDate(LocalDate.of(2026, 9, 10));
-        request.setTravelEndDate(LocalDate.of(2026, 9, 20));
+        request.setTravelStartDate(LocalDate.now().plusDays(1));
+        request.setTravelEndDate(LocalDate.now().plusDays(10));
         request.setCoverType("TRAVEL");
         request.setSumInsured(new BigDecimal("10000"));
         return request;

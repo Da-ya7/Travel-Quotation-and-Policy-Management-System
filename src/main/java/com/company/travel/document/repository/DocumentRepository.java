@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface DocumentRepository extends JpaRepository<Document, Long> {
     List<Document> findByQuotationIdOrderByUploadedAtAsc(Long quotationId);
+
+    List<Document> findByQuotationIdAndStatus(Long quotationId, String status);
 }

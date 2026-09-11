@@ -6,6 +6,7 @@ import com.company.travel.auth.service.UserService;
 import com.company.travel.config.SecurityConfig;
 import com.company.travel.quotation.dto.QuotationResponse;
 import com.company.travel.quotation.service.QuotationService;
+import com.company.travel.policy.service.PolicyConversionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,9 @@ class QuotationControllerAuthorizationTest {
 
     @MockitoBean
     private QuotationService quotationService;
+
+    @MockitoBean
+    private PolicyConversionService policyConversionService;
 
     @MockitoBean
     private CustomUserDetailsService customUserDetailsService;
@@ -79,6 +83,30 @@ class QuotationControllerAuthorizationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(9))
                 .andExpect(jsonPath("$.status").value("DRAFT"));
+    }
+
+    @Test
+    @WithMockUser(username = "uw.ravi", authorities = "OTHER_AUTHORITY")
+    void missingConvertAuthorityIsForbidden() throws Exception {
+        mockMvc.perform(post("/api/v1/quotations/9/convert-to-policy"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "uw.ravi", authorities = "QUOTATION_CONVERT_POLICY")
+    void convertWithAuthorityCallsService() throws Exception {
+        com.company.travel.policy.entity.Policy policy = new com.company.travel.policy.entity.Policy();
+        policy.setId(10L);
+        policy.setPolicyNumber("PL-2026-000001");
+        policy.setQuotationId(9L);
+        policy.setStatus("ISSUED");
+        when(policyConversionService.convert(9L, "uw.ravi"))
+                .thenReturn(com.company.travel.policy.dto.PolicyResponse.from(policy));
+
+        mockMvc.perform(post("/api/v1/quotations/9/convert-to-policy"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.quotationId").value(9))
+                .andExpect(jsonPath("$.status").value("ISSUED"));
     }
 
     @Test
