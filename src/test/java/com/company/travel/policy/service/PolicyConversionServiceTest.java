@@ -8,6 +8,7 @@ import com.company.travel.document.repository.DocumentRepository;
 import com.company.travel.payment.entity.Payment;
 import com.company.travel.payment.repository.PaymentRepository;
 import com.company.travel.policy.entity.Policy;
+import com.company.travel.policy.entity.PolicyReferral;
 import com.company.travel.policy.exception.PolicyConversionException;
 import com.company.travel.policy.repository.PolicyRepository;
 import com.company.travel.quotation.entity.Quotation;
@@ -36,6 +37,7 @@ class PolicyConversionServiceTest {
     private PolicyRepository policyRepository;
     private UserService userService;
     private WarGeographyMatchingService warGeographyMatchingService;
+    private PolicyReferralService policyReferralService;
     private PolicyConversionService service;
 
     @BeforeEach
@@ -46,10 +48,12 @@ class PolicyConversionServiceTest {
         policyRepository = mock(PolicyRepository.class);
         userService = mock(UserService.class);
         warGeographyMatchingService = mock(WarGeographyMatchingService.class);
+        policyReferralService = mock(PolicyReferralService.class);
         when(warGeographyMatchingService.match(any(), any()))
                 .thenReturn(new WarGeographyMatchingService.MatchResult(false, null));
         service = new PolicyConversionService(quotationRepository, paymentRepository,
-                documentRepository, policyRepository, userService, warGeographyMatchingService);
+                documentRepository, policyRepository, userService, warGeographyMatchingService,
+                policyReferralService);
     }
 
     @Test
@@ -67,6 +71,7 @@ class PolicyConversionServiceTest {
         assertEquals(7L, response.getCreatedByUserId());
         verify(policyRepository).save(any(Policy.class));
         verify(quotationRepository).save(quotation);
+        verify(policyReferralService, never()).createPendingReferral(any(), any(), any());
     }
 
     @Test
@@ -82,6 +87,24 @@ class PolicyConversionServiceTest {
 
         assertEquals("PENDING_APPROVAL", response.getStatus());
         org.junit.jupiter.api.Assertions.assertTrue(response.isRequiresApproval());
+        verify(policyReferralService).createPendingReferral(any(Policy.class),
+                org.mockito.ArgumentMatchers.eq(7L), any());
+    }
+
+    @Test
+    void referralCreationFailurePropagatesBeforeQuotationConversion() {
+        Quotation quotation = givenEligibleQuotation();
+        when(warGeographyMatchingService.match(any(), any()))
+                .thenReturn(new WarGeographyMatchingService.MatchResult(true, null));
+        when(policyRepository.existsByPolicyNumber(any())).thenReturn(false);
+        when(policyRepository.save(any(Policy.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        org.mockito.Mockito.doThrow(new IllegalStateException("referral failure"))
+                .when(policyReferralService).createPendingReferral(any(), any(), any());
+
+        assertThrows(IllegalStateException.class, () -> service.convert(42L, "uw.ravi"));
+        assertEquals("PAYMENT_CONFIRMED", quotation.getStatus());
+        verify(quotationRepository, never()).save(quotation);
     }
 
     @Test

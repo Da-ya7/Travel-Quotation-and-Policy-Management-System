@@ -8,6 +8,8 @@ import com.company.travel.auth.exception.ResourceNotFoundException;
 import com.company.travel.auth.exception.UserNotMappedToGroupException;
 import com.company.travel.document.exception.InvalidDocumentsException;
 import com.company.travel.policy.exception.PolicyConversionException;
+import com.company.travel.policy.exception.PolicyReferralAccessDeniedException;
+import com.company.travel.policy.exception.PolicyReferralException;
 import com.company.travel.war.exception.DuplicateWarGeographyException;
 
 import org.springframework.http.HttpStatus;
@@ -119,6 +121,22 @@ public class GlobalExceptionHandler {
                                 .body(Map.of(
                                                 "error", exception.getErrorCode(),
                                                 "message", exception.getMessage()));
+        }
+
+        @ExceptionHandler(PolicyReferralException.class)
+        public ResponseEntity<Map<String, String>> handlePolicyReferral(
+                        PolicyReferralException exception) {
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                                .body(Map.of(
+                                                "error", exception.getErrorCode(),
+                                                "message", exception.getMessage()));
+        }
+
+        @ExceptionHandler(PolicyReferralAccessDeniedException.class)
+        public ResponseEntity<Map<String, String>> handlePolicyReferralAccessDenied(
+                        PolicyReferralAccessDeniedException exception) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                .body(Map.of("error", "ACCESS_DENIED"));
         }
 
         @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -36,17 +36,20 @@ public class PolicyConversionService {
     private final PolicyRepository policyRepository;
     private final UserService userService;
     private final WarGeographyMatchingService warGeographyMatchingService;
+    private final PolicyReferralService policyReferralService;
 
     public PolicyConversionService(QuotationRepository quotationRepository,
             PaymentRepository paymentRepository, DocumentRepository documentRepository,
             PolicyRepository policyRepository, UserService userService,
-            WarGeographyMatchingService warGeographyMatchingService) {
+            WarGeographyMatchingService warGeographyMatchingService,
+            PolicyReferralService policyReferralService) {
         this.quotationRepository = quotationRepository;
         this.paymentRepository = paymentRepository;
         this.documentRepository = documentRepository;
         this.policyRepository = policyRepository;
         this.userService = userService;
         this.warGeographyMatchingService = warGeographyMatchingService;
+        this.policyReferralService = policyReferralService;
     }
 
     @Transactional
@@ -98,6 +101,10 @@ public class PolicyConversionService {
         policy.setCreatedAt(now);
         policy.setUpdatedAt(now);
         Policy savedPolicy = policyRepository.save(policy);
+
+        if (requiresApproval) {
+            policyReferralService.createPendingReferral(savedPolicy, user.getId(), now);
+        }
 
         quotation.setStatus("CONVERTED");
         quotation.setUpdatedAt(now);
